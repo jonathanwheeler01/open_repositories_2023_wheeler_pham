@@ -6,12 +6,12 @@ author:
   - Ngoc-Minh Pham
 date: "2023-06-13"
 output:
-  powerpoint_presentation: default
+  #powerpoint_presentation: default
     #reference_doc: ref_doc.pptx
-  slidy_presentation: default
+  #slidy_presentation: default
   beamer_presentation:
     theme: "PaloAlto"
-    colortheme: "seagull"
+    colortheme: "crane"
     fonttheme: "structurebold"
 knit: (function(inputFile, encoding) {
   rmarkdown::render(inputFile, encoding = encoding,
@@ -19,18 +19,223 @@ knit: (function(inputFile, encoding) {
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
-```{r load libraries, include=FALSE}
+```{r read data and create plot objects, include=FALSE, message=FALSE}
 library(WDI)
-library(tidyverse)
+library(dplyr)
 library(readr)
 library(ggplot2)
 library(lubridate)
-```
+library(zoo)
+library(tidyr)
 
-```{r import WB pop data, include=FALSE}
+## Read the aggregated data output by 'aggregate_raw_RAMP_data.py.'
+ramp <- read_csv('../raw_data/ramp_sample_2019-2021.csv')
+
+## Import the global region code lookup table.
+globalns <- read_csv('../supplemental_data/north_south.csv')
+
+# Convert country codes to lowercase.
+# They are lowercase in the RAMP data, so this allows us to merge.
+globalns$Countryabbre <- tolower(globalns$Countryabbre)
+
+## Merge the datasets.
+## Some rows will be dropped due to the use of 'unknown region' codes
+## xkk and zzz in the RAMP data that cannot be joined to the regional
+## country coded lookup table.
+ramp <- merge(ramp, globalns,
+                          by.x = "country", by.y = "Countryabbre") %>% 
+  rename(region = Location, iso3c = country) %>% 
+  mutate(iso3c = toupper(iso3c), year = year(date))
+
+## For our initial overview, we use RAMP data by itself to demonstrate 
+## trends by device type during COVID.
+
+## Get the number of IR in the sample
+## Data were cleaned and aggregated using Python
+## The sample includes only IR that were in RAMP
+## as of Jan 1, 2019
+ir_sample <- unique(ramp$repository_id) # 45
+
+## repository_id is otherwise unused
+## remove this column
+ramp <- ramp %>% 
+  select(-repository_id)
+
+## convert region to a factor with labels
+## 1 == Global South, 2 == Global North
+ramp$region <- as.factor(ramp$region)
+levels(ramp$region)[1] <- 'Global South'
+levels(ramp$region)[2] <- 'Global North'
+
+# Plot total clicks per day
+# with moving average at week (7), month (30), quarter (90)
+total_clicks_per_day <- ramp %>% 
+  select(date, clicks) %>% 
+  group_by(date) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_week = zoo::rollmean(total_clicks, k = 7, fill = NA),
+         avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA),
+         avg_clicks_quarter = zoo::rollmean(total_clicks, k = 90, fill = NA)
+  ) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks,
+                        avg_clicks_week,
+                        avg_clicks_month,
+                        avg_clicks_quarter)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_week",
+                                "avg_clicks_month",
+                                "avg_clicks_quarter"),
+                     labels = c("7 day", "30 day", "90 day"),
+                     values = c("firebrick1", "blue4", "yellow4", "black")) +
+  scale_linewidth_manual(values = c(1.2, 1.2, 1.2, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.7, .7, .7, .4),
+                     guide = FALSE) +
+  labs(title = "Total clicks per day (2019-2021)",
+       subtitle = "RAMP participating institutional repositories",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling averages") +
+  theme_linedraw()
+
+## Going to use the 30 day average throughout
+## 30 day is smooth but not too smooth
+## Total clicks per day, 30 day rolling average
+## faceted by global region
+total_clicks_30day_ma_region <- ramp %>% 
+  select(date, clicks, region) %>% 
+  group_by(region, date) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(1, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.9, .4),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region)) +
+  labs(title = "Total clicks per day (2019-2021)",
+       subtitle = "By global region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## Above, filtered to just 2020
+total_clicks_30day_ma_region_2020 <- ramp %>% 
+  select(date, clicks, region, year) %>% 
+  group_by(year, region, date) %>% 
+  filter(year == "2020") %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(1, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.9, .4),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region)) +
+  labs(title = "Total clicks per day (2020)",
+       subtitle = "By global region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## The full 2019-2021 time series
+## clicks by device
+## faceted by region
+clicks_device_region_all <- ramp %>% 
+  select(date, clicks, region, device) %>% 
+    group_by(region, device, date) %>% 
+    summarise(total_clicks = sum(clicks)) %>% 
+    mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+    pivot_longer(names_to = "date_range",
+                 values_to = "sum_clicks",
+                 cols = c(total_clicks, avg_clicks_month)) %>% 
+    ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+    geom_line(mapping = aes(linewidth = date_range,
+                            alpha = date_range)) +
+    scale_color_manual(breaks = c("avg_clicks_month"),
+                       labels = c("30 day"),
+                       values = c("red", "black")) +
+    scale_linewidth_manual(values = c(.75, .5),
+                           guide = FALSE) +
+    scale_alpha_manual(values = c(.8, .6),
+                       guide = FALSE) +
+    facet_wrap(facets = vars(region, device)) +
+    labs(title = "Total clicks per day (2019-2021)",
+         subtitle = "By global region and device",
+         x = element_blank(),
+         y = element_blank(),
+         color = "Rolling average") +
+    theme_linedraw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+## As above, filtered to 2020
+## faceted by device and region
+clicks_device_region_2020 <- ramp %>% 
+  select(date, clicks, region, device, year) %>% 
+  group_by(year, region, device, date) %>% 
+  filter(year == "2020") %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(.75, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.8, .6),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Total clicks per day (2020)",
+       subtitle = "By global region and device",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## A previous analysis on a smaller dataset
+## indicated that users in the global south
+## are more likely to use mobile devices
+## than users from the global north.
+## This is evident from above, but
+## we now make this comparison with the larger
+## dataset and augment with World Bank population data
 # Get World Bank population data
 
 # Web search gives the following as total population indicator
@@ -38,9 +243,8 @@ library(lubridate)
 world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
                  start = 2019,
                  end = 2021)
-```
 
-```{r merge WB with region classifications, include=FALSE}
+# need to add region data to population data
 global_region <- read_csv('../supplemental_data/north_south.csv')
 
 # merge region data to population data
@@ -57,111 +261,125 @@ pop_region$region <- as.factor(pop_region$region)
 levels(pop_region$region)[1] <- 'Global South'
 levels(pop_region$region)[2] <- 'Global North'
 
-# convert year
-pop_region$year <- year(as_date(as.character(pop_region$year),
-                                format="%Y"))
-pop_region$y_fac <- as.factor(pop_region$year)
-pop_region$y_char <- as.character(pop_region$year)
-
-
-# total pop per year per region
-# this is the "ground truth" pop totals for 
-# analysis with RAMP data
-pop_region_year <- pop_region %>% 
-  select(region, y_char, population) %>% 
-  group_by(region, y_char) %>% 
-  summarise(regional_population = sum(population))
-```
-
-```{r read RAMP data}
-# read the RAMP data for country and device access
-# 2019-01-01 through 2021-12-31
-ramp <- read_csv("../raw_data/ramp_country_coded_2019-2021.csv")
-```
-
-```{r edit ramp data}
-ramp <- ramp %>% 
-  rename(region = Location, iso3c = country) %>% 
-  mutate(iso3c = toupper(iso3c), year = year(ramp$date))
-
-# make Location a factor
-ramp$region <- as.factor(ramp$region)
-levels(ramp$region)[1] <- 'Global South'
-levels(ramp$region)[2] <- 'Global North'
-```
-
-```{r join RAMP and WB pop data}
+# join RAMP data with population data
 ramp_pop <- inner_join(ramp, world_pop,
                        by = c("iso3c", "year"))
-```
 
-```{r clicks by device and country}
-clicks_by_device_country <- ramp_pop %>% 
-  select(clicks, Country, region, population, device, year) %>% 
-  group_by(year, Country, region, device, population) %>% 
-  summarise(clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/population)*100) %>% 
-  arrange(desc(clicks_weighted))
-```
-
-```{r clicks by device and region}
-clicks_by_device_region <- clicks_by_device_country %>% 
+# We can look at clicks by device and by region
+clicks_by_device_region <- ramp_pop %>% 
   select(region, population, device, clicks, year) %>% 
-  group_by(year, region, device) %>% 
-  summarise(pop = sum(population),
-            clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/pop)*100) %>% 
-  arrange(desc(region))
-```
-
-```{r part 1}
-# clicks by region
-clicks_region <- ramp_pop %>% 
-  select(clicks, region, year) %>% 
-  group_by(year, region) %>% 
+  group_by(region, device, population, year) %>% 
   summarise(clicks = sum(clicks)) %>% 
-  mutate(percent = clicks/sum(clicks)*100)
+  group_by(region, device, year) %>% 
+  summarize(pop = sum(population),
+            clicks = sum(clicks)) %>% 
+  mutate(clicks_weighted = (clicks/pop)*100) %>%
+  arrange(desc(region))
 
-# average clicks per population
-# by region
-avg_clicks_region_bypop <- ramp_pop %>%
-  select(clicks, region, population, year)%>%
-  mutate(mean_clicks = clicks/population) %>% 
-  group_by(year, region)%>%
-  summarise(mean_clicks = sum(mean_clicks))
+# Note we are using population data to allow us
+# to derive population weighted click values
+# First, plot using unweighted values
+options(scipen = 999)
+unweighted_clicks_device <- clicks_by_device_region %>% 
+  ggplot(aes(x = year, y = clicks, color = region)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Clicks by device (2019-2021)",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
+
+
+# Now use clicks weighted by population
+weighted_clicks_device <- clicks_by_device_region %>% 
+  ggplot(aes(x = year, y = clicks_weighted, color = region)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Clicks by device (2019-2021)",
+       subtitle = "Weighted by population (per 100 people)",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
 ```
 
-## Data Sources
+# Background
 
-Slide with text and bullets.
+## About the Repository Analytics and Metrics Portal (RAMP)
 
-- RAMP
-- World Bank
+- Aggregate search engine performance metrics
+  - Google search properties
+  - Consistent reporting across repositories and platforms
+  - Longitudinal data (since 2017 for some IR)
+  - No-cost, online dashboards for participating repositories
+- Open datasets
+  - [Subset of 35 IR, Jan 1 - May 31, 2019](https://datadryad.org/stash/dataset/doi:10.5061%2Fdryad.fbg79cnr0)
+  - [All participating IR (with consent), 2017 - 2021](https://datadryad.org/search?q=repository+analytics+and+metrics+portal)
+  - [Complete documentation is available.](https://digitalrepository.unm.edu/ulls_fsp/141/)
 
-## Global Population 2019-2021
+## Objectives
 
-```{r pop table}
-# doesn't look good in PDF
-knitr::kable(pop_region_year, caption = "World population by region")
+Invite discussion about future research and the future of RAMP.
+
+- Previous analysis of the Jan - May 2019 subset (Spring 2020: Pre-COVID!)
+  - Access of IR content is unevenly distributed across IR and items
+  - Users from the global south are far more likely to use mobile devices
+  - Weak but significant correlation between population and access of IR content
+- Redo previous analysis with more data
+  - _**Identify**_ COVID impact, if any, on access of IR content
+  - Surface trends in RAMP data and identify external data source of research 
+  interest
+  - Define research questions and invite further analysis and participation
+
+## About the present sample
+
+- Three years of data for 45 repositories
+  - Repositories not in RAMP before January 1, 2019 excluded
+  - Date range January 1, 2019 - December 31, 2021
+- Limitations
+  - Cannot assess or compare with longer term trends
+  - Sample is not representative
+    - Global regions
+    - Languages
+  - Google Search Console API is the sole data source
+
+# Trends
+
+## General seasonal trend (2019-2021)
+
+Daily totals with 7 day, 30 day, and 90 day moving averages.
+
+```{r seasonal trends across dataset, message=FALSE}
+total_clicks_per_day
 ```
 
-## Global Population Growth 2019-2021
+## COVID disruption of seasonal trend (2020)
 
-```{r population plot}
-# not a very interesting plot
-# exclude from final
-ggplot(pop_region_year, aes(y_char, log(regional_population),
-                            group = region,
-                            color = region)) +
-  geom_line() +
-  theme_light() +
-  labs(x = element_blank(),
-       y = "Log of population")
+Daily totals with 30-day moving average.
+
+```{r COVID disruption of trend 2020}
+total_clicks_30day_ma_region_2020
 ```
 
-## Python hello
+## COVID 2020 disruption by device
 
-```{python}
+Daily totals with 30-day moving average.
 
-print("Hello world!")
+```{r COVID 2020 disruption by device}
+clicks_device_region_2020
+```
+
+## Overall clicks by device
+
+```{r}
+unweighted_clicks_device
+```
+
+## Clicks by device, weighted by popuation (World Bank)
+
+```{r}
+weighted_clicks_device
 ```

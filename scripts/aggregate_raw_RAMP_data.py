@@ -3,6 +3,43 @@
 Created on Thu Feb  2 13:44:28 2023
 
 @author: jwheel01
+
+This script aggregates per-month CSV files of RAMP data into a single
+CSV file for the period of study (Jan 1, 2019 - Dec 31, 2021)
+used in the analysis described in Wheeler and Pham's 
+2023 Open Repositories presentation.
+
+The data are large and cannot be uploaded or synced to GitHub. To use this
+script, it is recommended to download the data from the following Dryad
+repositories:
+  
+  * 2019 RAMP data: Wheeler, Jonathan; Arlitsch, Kenning (2021), 
+  Repository Analytics and Metrics Portal (RAMP) 2019 data, Dryad, 
+  Dataset, https://doi.org/10.5061/dryad.crjdfn342
+  
+  * 2020 RAMP data: Wheeler, Jonathan; Arlitsch, Kenning (2021), 
+  Repository Analytics and Metrics Portal (RAMP) 2020 data, Dryad, 
+  Dataset, https://doi.org/10.5061/dryad.dv41ns1z4
+  
+  * 2021 RAMP data: Wheeler, Jonathan; Arlitsch, Kenning (2023), 
+  Repository Analytics and Metrics Portal (RAMP) 2021 data, Dryad, 
+  Dataset, https://doi.org/10.5061/dryad.1rn8pk0tz
+  
+The script will unzip the data as part of the aggregation process, so there
+is no need to unzip downloaded datasets. The paths to the zip files in the
+script expect each year's data to be in a single directory. Data should be
+stored accordingly:
+  
+  * Zipped data for 2019 should be saved to ./raw_data/2019/
+  * Zipped data for 2020 should be saved to ./raw_data/2020/
+  * Zipped data for 2021 should be saved to ./raw_data/2021/
+
+The output of this script is a subset of the data limited to repositories 
+that were participating in RAMP as of January 1, 2019. The output file will 
+be saved to the ./raw_data/ directory and used as the input file to the
+or23_analysis.R script as well as the R Markdown version of the analysis
+and presentation, open_repositories2023.Rmd.
+
 """
 #%% Import libraries
 import pandas as pd
@@ -62,39 +99,6 @@ print(ramp_sample.info())
 
 #%% Save sample as CSV
 ramp_sample.to_csv("../results/ramp_sample_2019-2021.csv", index=False)
-
-#%% Resample by period and aggregate
-
-cols = ['position', 'clickThrough', 'country', 'device', 'impressions', 'date', 'index', 'repository_id']
-click_data  = dt_resample_aggregate(ramp_sample, cols, 'D', np.sum)
-
-#%% Plot monthly clicksums
-
-ax = click_data.plot(legend=False)
-ax.set_title('Daily clicksums on all URLs for all IR in sample')
-
-click_data.rolling(window=14).mean().plot(ax=ax)
-click_data.rolling(window=30).mean().plot(ax=ax)
-click_data.rolling(window=90).mean().plot(ax=ax)
-
-ax.legend(['Daily total', 'Two week avg', 'Monthly avg', 'Quarterly avg'])
-
-#%% Use raw data: Drop cols from sample for rolling means
-
-ramp_sample_clicks = ramp_sample.drop(columns=cols)
-
-#%% Check data
-
-ramp_sample_clicks.head()
-ramp_sample_clicks.info()
-
-#%% Rolling averages on raw data
-
-ax = ramp_sample['clicks'].plot(legend=False)
-
-ramp_sample['clicks'].rolling(window=7).mean().plot(ax=ax)
-
-ax.legend(['Daily clicksums', 'Weekly avg'])
 
 
 

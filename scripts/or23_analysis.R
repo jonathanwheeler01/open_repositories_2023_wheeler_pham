@@ -1,9 +1,217 @@
 library(WDI)
-library(tidyverse)
+library(dplyr)
 library(readr)
 library(ggplot2)
 library(lubridate)
+library(zoo)
+library(tidyr)
 
+## Read the aggregated data output by 'aggregate_raw_RAMP_data.py.'
+ramp <- read_csv('./raw_data/ramp_sample_2019-2021.csv')
+
+## Import the global region code lookup table.
+globalns <- read_csv('./supplemental_data/north_south.csv')
+
+# Convert country codes to lowercase.
+# They are lowercase in the RAMP data, so this allows us to merge.
+globalns$Countryabbre <- tolower(globalns$Countryabbre)
+
+## Merge the datasets.
+## Some rows will be dropped due to the use of 'unknown region' codes
+## xkk and zzz in the RAMP data that cannot be joined to the regional
+## country coded lookup table.
+ramp <- merge(ramp, globalns,
+                          by.x = "country", by.y = "Countryabbre") %>% 
+  rename(region = Location, iso3c = country) %>% 
+  mutate(iso3c = toupper(iso3c), year = year(date))
+
+## For our initial overview, we use RAMP data by itself to demonstrate 
+## trends by device type during COVID.
+
+## Get the number of IR in the sample
+## Data were cleaned and aggregated using Python
+## The sample includes only IR that were in RAMP
+## as of Jan 1, 2019
+ir_sample <- unique(ramp$repository_id) # 45
+
+## repository_id is otherwise unused
+## remove this column
+ramp <- ramp %>% 
+  select(-repository_id)
+
+## convert region to a factor with labels
+## 1 == Global South, 2 == Global North
+ramp$region <- as.factor(ramp$region)
+levels(ramp$region)[1] <- 'Global South'
+levels(ramp$region)[2] <- 'Global North'
+
+# Plot total clicks per day
+# with moving average at week (7), month (30), quarter (90)
+total_clicks_per_day <- ramp %>% 
+  select(date, clicks) %>% 
+  group_by(date) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_week = zoo::rollmean(total_clicks, k = 7, fill = NA),
+         avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA),
+         avg_clicks_quarter = zoo::rollmean(total_clicks, k = 90, fill = NA)
+  ) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks,
+                        avg_clicks_week,
+                        avg_clicks_month,
+                        avg_clicks_quarter)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_week",
+                                "avg_clicks_month",
+                                "avg_clicks_quarter"),
+                     labels = c("7 day", "30 day", "90 day"),
+                     values = c("firebrick1", "blue4", "yellow4", "black")) +
+  scale_linewidth_manual(values = c(1.2, 1.2, 1.2, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.7, .7, .7, .4),
+                     guide = FALSE) +
+  labs(title = "Total clicks per day (2019-2021)",
+       subtitle = "RAMP participating institutional repositories",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling averages") +
+  theme_linedraw()
+
+## Going to use the 30 day average throughout
+## 30 day is smooth but not too smooth
+## Total clicks per day, 30 day rolling average
+## faceted by global region
+total_clicks_30day_ma_region <- ramp %>% 
+  select(date, clicks, region) %>% 
+  group_by(region, date) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(1, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.9, .4),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region)) +
+  labs(title = "Total clicks per day (2019-2021)",
+       subtitle = "By global region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## Above, filtered to just 2020
+total_clicks_30day_ma_region_2020 <- ramp %>% 
+  select(date, clicks, region, year) %>% 
+  group_by(year, region, date) %>% 
+  filter(year == "2020") %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(1, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.9, .4),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region)) +
+  labs(title = "Total clicks per day (2020)",
+       subtitle = "By global region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## The full 2019-2021 time series
+## clicks by device
+## faceted by region
+clicks_device_region_all <- ramp %>% 
+  select(date, clicks, region, device) %>% 
+  group_by(region, device, date) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(.75, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.8, .6),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Total clicks per day (2019-2021)",
+       subtitle = "By global region and device",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+## As above, filtered to 2020
+## faceted by device and region
+clicks_device_region_2020 <- ramp %>% 
+  select(date, clicks, region, device, year) %>% 
+  group_by(year, region, device, date) %>% 
+  filter(year == "2020") %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(.75, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.8, .6),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Total clicks per day (2020)",
+       subtitle = "By global region and device",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## A previous analysis on a smaller dataset
+## indicated that users in the global south
+## are more likely to use mobile devices
+## than users from the global north.
+## This is evident from above, but
+## we now make this comparison with the larger
+## dataset and augment with World Bank population data
 # Get World Bank population data
 
 # Web search gives the following as total population indicator
@@ -12,7 +220,8 @@ world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
                  start = 2019,
                  end = 2021)
 
-global_region <- read_csv('../supplemental_data/north_south.csv')
+# need to add region data to population data
+global_region <- read_csv('./supplemental_data/north_south.csv')
 
 # merge region data to population data
 # drop columns we won't use
@@ -28,551 +237,102 @@ pop_region$region <- as.factor(pop_region$region)
 levels(pop_region$region)[1] <- 'Global South'
 levels(pop_region$region)[2] <- 'Global North'
 
-# convert year
-pop_region$year <- year(as_date(as.character(pop_region$year),
-                                format="%Y"))
-pop_region$y_fac <- as.factor(pop_region$year)
-pop_region$y_char <- as.character(pop_region$year)
+# join RAMP data with population data
+ramp_pop <- inner_join(ramp, world_pop,
+                       by = c("iso3c", "year"))
 
-
-# total pop per year per region
-# this is the "ground truth" pop totals for 
-# analysis with RAMP data
-pop_region_year <- pop_region %>% 
-  select(region, y_char, population) %>% 
-  group_by(region, y_char) %>% 
-  summarise(regional_population = sum(population))
-
-# not a very interesting plot
-#ggplot(pop_region_year, aes(y_char, regional_population,
-#                            group = region,
-#                            color = region)) +
-#  geom_line()
-
-# read the RAMP data for country and device access
-# 2019-01-01 through 2021-12-31
-ramp <- read_csv("../raw_data/ramp_country_coded_2019-2021.csv") %>% 
-  rename(region = Location, iso3c = country) %>% 
-  mutate(iso3c = toupper(iso3c))
-
-# make Location a factor
-ramp$region <- as.factor(ramp$region)
-levels(ramp$region)[1] <- 'Global South'
-levels(ramp$region)[2] <- 'Global North'
-
-
-# subset RAMP by year
-library(lubridate)
-ramp2019 <-  ramp %>% 
-  filter(year(ramp$date) == 2019)
-
-ramp2020 <-  ramp %>% 
-  filter(year(ramp$date) == 2020)
-
-ramp2021 <-  ramp %>% 
-  filter(year(ramp$date) == 2021)
-
-# subset world_pop by year
-pop2019 <-  world_pop %>% 
-  filter(world_pop$year == 2019)
-
-pop2020 <-  world_pop %>% 
-  filter(world_pop$year == 2020)
-
-pop2021 <-  world_pop %>% 
-  filter(world_pop$year == 2021)
-
-# join RAMP data to population data
-ramp2019_pop <- inner_join(ramp2019,
-                           pop2019,
-                           by = "iso3c")
-
-ramp2020_pop <- inner_join(ramp2020,
-                           pop2020,
-                           by = "iso3c")
-
-ramp2021_pop <- inner_join(ramp2021,
-                           pop2021,
-                           by = "iso3c")
-
-# aggregate by country/device combination
-# and calculate clicks weighted by population
-# "clicks_weighted is expressed as a percentage
-# of the population who accessed IR content
-# using the corresponding device
-clicks_by_device_country_2019 <- ramp2019_pop %>% 
-  select(clicks, Country, region, population, device) %>% 
-  group_by(Country, region, device, population) %>% 
+# We can look at clicks by device and by region
+clicks_by_device_region <- ramp_pop %>% 
+  select(region, population, device, clicks, year) %>% 
+  group_by(region, device, population, year) %>% 
   summarise(clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/population)*100) %>% 
-  arrange(desc(clicks_weighted))
-
-clicks_by_device_country_2020 <- ramp2020_pop %>% 
-  select(clicks, Country, region, population, device) %>% 
-  group_by(Country, region, device, population) %>% 
-  summarise(clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/population)*100) %>% 
-  arrange(desc(clicks_weighted))
-
-clicks_by_device_country_2021 <- ramp2021_pop %>% 
-  select(clicks, Country, region, population, device) %>% 
-  group_by(Country, region, device, population) %>% 
-  summarise(clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/population)*100) %>% 
-  arrange(desc(clicks_weighted))
-
-# same as above, by region not country
-clicks_by_device_region_2019 <- clicks_by_device_country_2019 %>% 
-  select(region, population, device, clicks) %>% 
-  group_by(region, device) %>% 
+  group_by(region, device, year) %>% 
   summarize(pop = sum(population),
             clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/pop)*100) %>% 
+  mutate(clicks_weighted = (clicks/pop)*100) %>%
   arrange(desc(region))
 
-clicks_by_device_region_2020 <- clicks_by_device_country_2020 %>% 
-  select(region, population, device, clicks) %>% 
-  group_by(region, device) %>% 
-  summarize(pop = sum(population),
-            clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/pop)*100) %>% 
-  arrange(desc(region))
+# Note we are using population data to allow us
+# to derive population weighted click values
+# First, plot using unweighted values
+options(scipen = 999)
+unweighted_clicks_device <- clicks_by_device_region %>% 
+  ggplot(aes(x = year, y = clicks, color = region)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Clicks by device (2019-2021)",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
 
-clicks_by_device_region_2021 <- clicks_by_device_country_2021 %>% 
-  select(region, population, device, clicks) %>% 
-  group_by(region, device) %>% 
-  summarize(pop = sum(population),
-            clicks = sum(clicks)) %>% 
-  mutate(clicks_weighted = (clicks/pop)*100) %>% 
-  arrange(desc(region))
+# Now use clicks weighted by population
+weighted_clicks_device <- clicks_by_device_region %>% 
+  ggplot(aes(x = year, y = clicks_weighted, color = region)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Clicks by device (2019-2021)",
+       subtitle = "Weighted by population (per 100 people)",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
 
+## Problem with the above is the population difference
+## between regions biases population weighted clicks
+## at a global scale in favor of the global north.
 
-# ----------------PART I: Global patterns in accessing academic knowledge
-##---------------- clicks from users in the global north and south
-clicks_region_2019 <- ramp2019_pop %>% 
-  select(clicks, region) %>% 
-  group_by(region) %>% 
-  summarise(clicks = sum(clicks)) %>% 
-  mutate(percent = clicks/sum(clicks)*100)
-
-clicks_region_2020 <- ramp2020_pop %>% 
-  select(clicks, region) %>% 
-  group_by(region) %>% 
-  summarise(clicks = sum(clicks)) %>% 
-  mutate(percent = clicks/sum(clicks)*100)
-
-clicks_region_2021 <- ramp2021_pop %>% 
-  select(clicks, region) %>% 
-  group_by(region) %>% 
-  summarise(clicks = sum(clicks)) %>% 
-  mutate(percent = clicks/sum(clicks)*100)
-
-
-##--------------average clicks per country in the global north and the 
-## global south. This is the avg clicks per country in each region
-
-# Leaving this out of OR23 analysis
-
-country_click_2019 <- ramp2019_pop %>%
-  select(clicks, Country, region)%>%
-  group_by(Country, region)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks)) %>% 
-  group_by(region) %>% 
-  mutate(mean_click = mean(clicks))
-
-country_click_2020 <- ramp2020_pop %>%
-  select(clicks, Country, region)%>%
-  group_by(Country, region)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks)) %>% 
-  group_by(region) %>% 
-  mutate(mean_click = mean(clicks))
-
-country_click_2021 <- ramp2021_pop %>%
-  select(clicks, Country, region)%>%
-  group_by(Country, region)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks)) %>% 
-  group_by(region) %>% 
-  mutate(mean_click = mean(clicks))
-
-# Maybe a different way to look at the above
-ramp2019_pop %>%
-  select(clicks, Country, region)%>%
-  group_by(Country, region)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks)) %>% 
-  group_by(region) %>%
-  filter(region == "Global North") %>% 
-  summary()
-
-ramp2019_pop %>%
-  select(clicks, Country, region)%>%
-  group_by(Country, region)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks)) %>% 
-  group_by(region) %>%
-  filter(region == "Global South") %>% 
-  summary()
-
-
-##--------------average clicks per population in the global north 
-## and the global south
-ramp2019_pop %>%
-  select(clicks, Country, region, population)%>%
-  group_by(Country, region, population)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks))%>%
-  mutate(mean_click = clicks/population)%>%
-  group_by(region)%>%
-  filter(region == "Global South") %>% 
-  summary()
-  
-ramp2020_pop %>%
-  select(clicks, Country, region, population)%>%
-  group_by(Country, region, population)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks))%>%
-  mutate(mean_click = clicks/population)%>%
-  group_by(region)%>%
-  filter(region == "Global South") %>% 
-  summary()
-
-ramp2021_pop %>%
-  select(clicks, Country, region, population)%>%
-  group_by(Country, region, population)%>%
-  summarise(clicks = sum(clicks))%>%
-  arrange(desc(clicks))%>%
-  mutate(mean_click = clicks/population)%>%
-  group_by(region)%>%
-  filter(region == "Global South") %>% 
-  summary()
-
+## We can look more closely at this by limiting
+## analysis to top 10 from each region
 ## Plot change in clicks relative to change in population
 ##---top 10 countries which generate most clicks
 # not weighted by population
-head(ramp2021_pop%>%
-       select(clicks, Country, region)%>%
-       group_by(Country, region)%>%
-       summarise(clicks = sum(clicks))%>%
-       arrange(desc(clicks)),10)
+# seems we need a function to do this by region and year
+top_10 <- function(y, r) {
+  t10 <- ramp_pop %>%
+    filter(year == y, region == r) %>% 
+    select(clicks, Country, region, year) %>%
+    group_by(Country, region, year) %>%
+    summarise(clicks = sum(clicks)) %>%
+    slice_max(clicks, n = 10) %>% 
+    arrange(desc(clicks))
+  return(head(t10, 10))
+}
+
+gn2019t10 <- top_10("2019", "Global North")
+gn2020t10 <- top_10("2020", "Global North")
+gn2021t10 <- top_10("2021", "Global North")
+gs2019t10 <- top_10("2019", "Global South")
+gs2020t10 <- top_10("2020", "Global South")
+gs2021t10 <- top_10("2021", "Global South")
+
+t10All <- gn2019t10 %>% 
+  bind_rows(gn2020t10, gn2021t10, gs2019t10, gs2020t10, gs2021t10)
 
 # weighted by population
-top_10_n <- head(ramp2019_pop%>%
-                   mutate(click_weighted = (clicks/population)*100,
-                          year = 2019) %>% 
-                   select(clicks, Country, population, region, 
-                          click_weighted, year)%>%
-                   group_by(Country, population, region, year)%>%
-                   filter(region == "Global North") %>% 
-                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                   arrange(desc(clicks_weighted)),10)
-
-top_10_n <- rbind(top_10_n, head(ramp2020_pop%>%
-                                   mutate(click_weighted = (clicks/population)*100,
-                                          year = 2020) %>% 
-                                   select(clicks, Country, population, region,
-                                          click_weighted, year)%>%
-                                   group_by(Country, population, region, year)%>%
-                                   filter(region == "Global North") %>% 
-                                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                                   arrange(desc(clicks_weighted)),10))
-
-top_10_n <- rbind(top_10_n, head(ramp2021_pop%>%
-                                   mutate(click_weighted = (clicks/population)*100,
-                                          year - 2021) %>% 
-                                   select(clicks, Country, population, region,
-                                          click_weighted, year) %>%
-                                   group_by(Country, population, region, year)%>%
-                                   filter(region == "Global North") %>% 
-                                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                                   arrange(desc(clicks_weighted)),10))
-
-
-
-top_10_s <- head(ramp2019_pop%>%
-                 mutate(click_weighted = (clicks/population)*100,
-                        year = 2019) %>% 
-                 select(clicks, Country, population, region, 
-                        click_weighted, year)%>%
-                 group_by(Country, population, region, year)%>%
-                 filter(region == "Global South") %>% 
-                 summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                 arrange(desc(clicks_weighted)),10)
-
-top_10_s <- rbind(top_10_s, head(ramp2020_pop%>%
-                            mutate(click_weighted = (clicks/population)*100,
-                                   year = 2020) %>% 
-                            select(clicks, Country, population, region,
-                                   click_weighted, year)%>%
-                            group_by(Country, population, region, year)%>%
-                            filter(region == "Global South") %>% 
-                            summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                            arrange(desc(clicks_weighted)),10))
-
-top_10_s <- rbind(top_10_s, head(ramp2021_pop%>%
-                            mutate(click_weighted = (clicks/population)*100,
-                                   year - 2021) %>% 
-                            select(clicks, Country, population, region,
-                                   click_weighted, year) %>%
-                            group_by(Country, population, region, year)%>%
-                            filter(region == "Global South") %>% 
-                            summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                            arrange(desc(clicks_weighted)),10))
-
-## plot
-ggplot(top_10_n, mapping = aes(x = year, 
-                               y = clicks_weighted,
-                               color = Country)) +
-  geom_line(size = 1.5)
-
-ggplot(top_10_s, mapping = aes(x = year, 
-                               y = clicks_weighted,
-                               color = Country)) +
-  geom_line(size = 1.5)
-
-
-# this gets them all into 1 plot but is hard to read
-top_10_ns <- rbind(top_10_n, top_10_s)
-ggplot(top_10_ns, mapping = aes(x = year, 
-                               y = clicks_weighted,
-                               color = Country)) +
-  geom_line(size = 1.5)
-
-
-# same for top 5
-top_5_n <- head(ramp2019_pop%>%
-                   mutate(click_weighted = (clicks/population)*100,
-                          year = 2019) %>% 
-                   select(clicks, Country, population, region, 
-                          click_weighted, year)%>%
-                   group_by(Country, population, region, year)%>%
-                   filter(region == "Global North") %>% 
-                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                   arrange(desc(clicks_weighted)),5)
-
-top_5_n <- rbind(top_5_n, head(ramp2020_pop%>%
-                                   mutate(click_weighted = (clicks/population)*100,
-                                          year = 2020) %>% 
-                                   select(clicks, Country, population, region,
-                                          click_weighted, year)%>%
-                                   group_by(Country, population, region, year)%>%
-                                   filter(region == "Global North") %>% 
-                                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                                   arrange(desc(clicks_weighted)),5))
-
-top_5_n <- rbind(top_5_n, head(ramp2021_pop%>%
-                                   mutate(click_weighted = (clicks/population)*100,
-                                          year - 2021) %>% 
-                                   select(clicks, Country, population, region,
-                                          click_weighted, year) %>%
-                                   group_by(Country, population, region, year)%>%
-                                   filter(region == "Global North") %>% 
-                                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                                   arrange(desc(clicks_weighted)),5))
-
-
-
-top_5_s <- head(ramp2019_pop%>%
-                   mutate(click_weighted = (clicks/population)*100,
-                          year = 2019) %>% 
-                   select(clicks, Country, population, region, 
-                          click_weighted, year)%>%
-                   group_by(Country, population, region, year)%>%
-                   filter(region == "Global South") %>% 
-                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                   arrange(desc(clicks_weighted)),5)
-
-top_5_s <- rbind(top_5_s, head(ramp2020_pop%>%
-                                   mutate(click_weighted = (clicks/population)*100,
-                                          year = 2020) %>% 
-                                   select(clicks, Country, population, region,
-                                          click_weighted, year)%>%
-                                   group_by(Country, population, region, year)%>%
-                                   filter(region == "Global South") %>% 
-                                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                                   arrange(desc(clicks_weighted)),5))
-
-top_5_s <- rbind(top_5_s, head(ramp2021_pop%>%
-                                   mutate(click_weighted = (clicks/population)*100,
-                                          year - 2021) %>% 
-                                   select(clicks, Country, population, region,
-                                          click_weighted, year) %>%
-                                   group_by(Country, population, region, year)%>%
-                                   filter(region == "Global South") %>% 
-                                   summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-                                   arrange(desc(clicks_weighted)),5))
-
-## plot
-ggplot(top_5_n, mapping = aes(x = year, 
-                               y = clicks_weighted,
-                               color = Country)) +
-  geom_line(size = 1.5)
-
-ggplot(top_5_s, mapping = aes(x = year, 
-                               y = clicks_weighted,
-                               color = Country)) +
-  geom_line(size = 1.5)
-
-
-# this gets them all into 1 plot but is hard to read
-top_5_ns <- rbind(top_5_n, top_5_s)
-ggplot(top_5_ns, mapping = aes(x = year, 
-                                y = clicks_weighted,
-                                color = Country)) +
-  geom_line(size = 1.5, aes(linetype = region))
-
-
-
-##---bottom 10 countries which generate most clicks
-# not weighted by population
-tail(ramp2019_pop%>%
-       select(clicks, Country, region)%>%
-       group_by(Country, region)%>%
-       summarise(clicks = sum(clicks))%>%
-       arrange(desc(clicks)),10)
-
-# weighted by population
-tail(ramp2019_pop%>%
-       mutate(click_weighted = (clicks/population)*100) %>% 
-       select(clicks, Country, population, region, click_weighted)%>%
-       group_by(Country, population, region)%>%
-       filter(region == "Global South") %>% 
-       summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
-       arrange(desc(clicks_weighted)),10)
-
-
-# ----------------PART II: Technologies & academics
-##----------------country, device, click
-country_click_device <- ramp2019_pop%>%
-  select(clicks, Country, region, device)%>%
-  group_by(Country, region, device)%>%
-  summarise(click_s = sum(clicks))%>%
-  arrange(desc(click_s))
-
-
-##----------------region, device, click
-region_click_device <- ramp2021_pop%>%
-  select(clicks, region, device)%>%
-  group_by(region, device)%>%
-  summarise(click_s = sum(clicks))%>%
-  arrange(desc(click_s))
-
-#------------------PART III: Click position bias and beyond
-click_position <- ramp2019_pop%>%
-  filter(clicks>0)%>%
-  select(position, device, clicks, region)
-
-click_position_unclicked <- ramp2021_pop%>%
-  filter(clicks==0)%>%
-  select(position, device, region)
-
-
-## position vs. clicks table
-library(psych)
-describeBy(ramp2019_pop$clicks, 
-           list(ramp2019_pop$region,
-                ramp2019_pop$device), mat=TRUE)
-describeBy(ramp2019_pop$position, 
-           list(ramp2019_pop$region, 
-                ramp2019_pop$device), mat=TRUE)
-
-
-## the above includes all rows with 0 clicks
-## useful info but lets set a boolean for clicks > 0
-ramp_clicked <- ramp2019_pop %>% filter(clicks > 0)
-describeBy(ramp_clicked$clicks, 
-           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
-describeBy(ramp_clicked$position, 
-           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
-describeBy(ramp_clicked$position, 
-           list(ramp_clicked$device), mat=TRUE)
-
-ramp_unclicked <- ramp2019_pop %>% filter(clicks == 0)
-describeBy(ramp_unclicked$position, 
-           list(ramp_unclicked$region, ramp_unclicked$device), mat=TRUE)
-describeBy(ramp_clicked$position, 
-           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
-describeBy(ramp_unclicked$position, 
-           list(ramp_unclicked$device), mat=TRUE)
-describeBy(ramp_clicked$position, 
-           list(ramp_clicked$device), mat=TRUE)
-
-##-- position, click vs. location, clicked
-ramp_clicked_south <- ramp2019_pop%>%
-  filter(region=='Global South', clicks >0)
-
-describeBy(ramp_clicked_south$position, 
-           list(ramp_clicked_south$device), mat=TRUE)
-
-ramp_clicked_north <- ramp2019_pop%>%
-  filter(region=='Global North', clicks >0)
-
-describeBy(ramp_clicked_north$position, 
-           list(ramp_clicked_north$device), mat=TRUE)
-
-
-##-- position, click vs. location, unclicked
-ramp_unclicked_south <- ramp2019_pop%>%
-  filter(region=='Global South', clicks==0)
-
-describeBy(ramp_unclicked_south$position, 
-           list(ramp_unclicked_south$device), mat=TRUE)
-
-ramp_unclicked_north <- ramp2019_pop%>%
-  filter(region=='Global North', clicks==0)
-
-describeBy(ramp_unclicked_north$position, 
-           list(ramp_unclicked_north$device), mat=TRUE)
-
-
-# exploring correlation between pop number and click number: 
-# weak but significant correlation with p smaller than .001
-library("Hmisc")
-cor(ramp2019_pop$position, 
-    ramp2019_pop$clicks, method = c("spearman"))
-
-m1 <- lm(clicks~region, data = country_click_2019)
-summary(m1)
-
-# original uses pop weighted clicks - would have to add
-# that to use this
-m2 <- lm(mean_click~region, data = country_click_2019)
-summary(m2)
-confint(m2)
-anova(m2, test = "Chisq")
-
-#finding correlation
-head(ramp2019_pop)
-ramp2019_pop$region_code <- as.numeric(ramp2019_pop$region)
-corr <- round(cor(ramp2019_pop[,c(2, 5, 7, 15, 16)], use="pairwise.complete.obs"), 1)
-library(ggcorrplot)
-ggcorrplot(corr, 
-           method = "circle",
-           hc.order = TRUE,
-           type = "upper",
-           outline.color = "white")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+top_10_pop_wt <- function(y, r) {
+  t10pwt <- ramp_pop%>%
+    filter(region == "Global North", year == "2019") %>% 
+    mutate(click_weighted = (clicks/population)*100) %>% 
+    select(clicks, Country, population, region, 
+           click_weighted, year)%>%
+    group_by(Country, region, year, population)%>%
+    summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
+    slice_max(clicks_weighted, n = 10) %>% 
+    arrange(desc(clicks_weighted))
+  return(head(t10pwt, 10))
+}
+
+gn2019t10pwt <- top_10_pop_wt("2019", "Global North")
+gn2020t10pwt <- top_10_pop_wt("2020", "Global North")
+gn2021t10pwt <- top_10_pop_wt("2021", "Global North")
+gs2019t10pwt <- top_10_pop_wt("2019", "Global South")
+gs2020t10pwt <- top_10_pop_wt("2020", "Global South")
+gs2021t10pwt <- top_10_pop_wt("2021", "Global South")
+
+t10Allpwt <- gn2019t10pwt %>% 
+  bind_rows(gn2020t10pwt, gn2021t10pwt, gs2019t10pwt, 
+            gs2020t10pwt, gs2021t10pwt)
 
