@@ -383,3 +383,15 @@ unweighted_clicks_device
 ```{r}
 weighted_clicks_device
 ```
+
+## Data Sources (other than RAMP data)
+
+- International Organization for Standardization. (2020),
+“ISO 3166 Country Codes”, ISO, Nongovernmental organization, 
+available at: https://www.iso.org/iso-3166-countrycodes.html 
+(accessed 12 April 2020).
+- Meta contributors. (2020), “List of countries by regional classification”, 
+Wikimedia Meta-Wiki, Meta, discussion about Wikimedia projects, 1 April, 
+available at:
+https://meta.wikimedia.org/w/index.php?title=List_of_countries_by_regional_classification&oldid=19943813 (accessed 12 April 2020).
+- World Bank. (2023), "Population, total," The World Bank Group, https://data.worldbank.org/indicator/SP.POP.TOTL.
