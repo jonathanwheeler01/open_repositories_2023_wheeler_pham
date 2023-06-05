@@ -293,8 +293,8 @@ weighted_clicks_device <- clicks_by_device_region %>%
 top_10 <- function(y, r) {
   t10 <- ramp_pop %>%
     filter(year == y, region == r) %>% 
-    select(clicks, Country, region, year) %>%
-    group_by(Country, region, year) %>%
+    select(clicks, Country, region, device, year) %>%
+    group_by(Country, region, year, device) %>%
     summarise(clicks = sum(clicks)) %>%
     slice_max(clicks, n = 10) %>% 
     arrange(desc(clicks))
@@ -311,14 +311,31 @@ gs2021t10 <- top_10("2021", "Global South")
 t10All <- gn2019t10 %>% 
   bind_rows(gn2020t10, gn2021t10, gs2019t10, gs2020t10, gs2021t10)
 
+## plot top 10 countries in both regions
+## not weighted by population
+t10All_plot <- t10All %>%
+  select(region, year, device, clicks) %>%
+  group_by(region, year, device) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  ggplot(aes(x = year, y = total_clicks, color = region)) +
+  geom_line(linewidth = 1, aes(group = region)) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Total click activity by device (2019-2021)",
+       subtitle = "Click activity limited to top 10 countries by region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
+
 # weighted by population
 top_10_pop_wt <- function(y, r) {
   t10pwt <- ramp_pop%>%
-    filter(region == "Global North", year == "2019") %>% 
+    filter(region == r, year == y) %>% 
     mutate(click_weighted = (clicks/population)*100) %>% 
     select(clicks, Country, population, region, 
-           click_weighted, year)%>%
-    group_by(Country, region, year, population)%>%
+           click_weighted, year, device)%>%
+    group_by(Country, region, year, population, device)%>%
     summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
     slice_max(clicks_weighted, n = 10) %>% 
     arrange(desc(clicks_weighted))
@@ -335,4 +352,21 @@ gs2021t10pwt <- top_10_pop_wt("2021", "Global South")
 t10Allpwt <- gn2019t10pwt %>% 
   bind_rows(gn2020t10pwt, gn2021t10pwt, gs2019t10pwt, 
             gs2020t10pwt, gs2021t10pwt)
+
+## plot top 10 countries in both regions
+## this time weighted by population
+t10Allpwt_plot <- t10Allpwt %>%
+  select(region, year, device, clicks_weighted) %>%
+  group_by(region, year, device) %>% 
+  summarise(total_clicks = sum(clicks_weighted)) %>% 
+  ggplot(aes(x = year, y = total_clicks, color = region)) +
+  geom_line(linewidth = 1, aes(group = region)) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Population-weighted click activity by device (2019-2021)",
+       subtitle = "Click activity limited to top 10 countries by region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
 
