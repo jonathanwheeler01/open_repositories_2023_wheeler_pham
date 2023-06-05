@@ -1,0 +1,167 @@
+---
+title: "Assessing the Global Divide"
+subtitle: "Repository access from the global north and south, before and after COVID"
+author: 
+  - Jon Wheeler
+  - Ngoc-Minh Pham
+date: "2023-06-13"
+output:
+  powerpoint_presentation: default
+    #reference_doc: ref_doc.pptx
+  slidy_presentation: default
+  beamer_presentation:
+    theme: "PaloAlto"
+    colortheme: "seagull"
+    fonttheme: "structurebold"
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding,
+  output_dir = "../presentations", output_format = "all") })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r load libraries, include=FALSE}
+library(WDI)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(lubridate)
+```
+
+```{r import WB pop data, include=FALSE}
+# Get World Bank population data
+
+# Web search gives the following as total population indicator
+# https://data.worldbank.org/indicator/SP.POP.TOTL
+world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
+                 start = 2019,
+                 end = 2021)
+```
+
+```{r merge WB with region classifications, include=FALSE}
+global_region <- read_csv('../supplemental_data/north_south.csv')
+
+# merge region data to population data
+# drop columns we won't use
+pop_region <- merge(world_pop, global_region, 
+                    by.x = "iso3c",
+                    by.y = "Countryabbre") %>% 
+  select(country, iso3c, year, population,
+         Location) %>% 
+  rename(region = Location)
+
+# make Location a factor
+pop_region$region <- as.factor(pop_region$region)
+levels(pop_region$region)[1] <- 'Global South'
+levels(pop_region$region)[2] <- 'Global North'
+
+# convert year
+pop_region$year <- year(as_date(as.character(pop_region$year),
+                                format="%Y"))
+pop_region$y_fac <- as.factor(pop_region$year)
+pop_region$y_char <- as.character(pop_region$year)
+
+
+# total pop per year per region
+# this is the "ground truth" pop totals for 
+# analysis with RAMP data
+pop_region_year <- pop_region %>% 
+  select(region, y_char, population) %>% 
+  group_by(region, y_char) %>% 
+  summarise(regional_population = sum(population))
+```
+
+```{r read RAMP data}
+# read the RAMP data for country and device access
+# 2019-01-01 through 2021-12-31
+ramp <- read_csv("../raw_data/ramp_country_coded_2019-2021.csv")
+```
+
+```{r edit ramp data}
+ramp <- ramp %>% 
+  rename(region = Location, iso3c = country) %>% 
+  mutate(iso3c = toupper(iso3c), year = year(ramp$date))
+
+# make Location a factor
+ramp$region <- as.factor(ramp$region)
+levels(ramp$region)[1] <- 'Global South'
+levels(ramp$region)[2] <- 'Global North'
+```
+
+```{r join RAMP and WB pop data}
+ramp_pop <- inner_join(ramp, world_pop,
+                       by = c("iso3c", "year"))
+```
+
+```{r clicks by device and country}
+clicks_by_device_country <- ramp_pop %>% 
+  select(clicks, Country, region, population, device, year) %>% 
+  group_by(year, Country, region, device, population) %>% 
+  summarise(clicks = sum(clicks)) %>% 
+  mutate(clicks_weighted = (clicks/population)*100) %>% 
+  arrange(desc(clicks_weighted))
+```
+
+```{r clicks by device and region}
+clicks_by_device_region <- clicks_by_device_country %>% 
+  select(region, population, device, clicks, year) %>% 
+  group_by(year, region, device) %>% 
+  summarise(pop = sum(population),
+            clicks = sum(clicks)) %>% 
+  mutate(clicks_weighted = (clicks/pop)*100) %>% 
+  arrange(desc(region))
+```
+
+```{r part 1}
+# clicks by region
+clicks_region <- ramp_pop %>% 
+  select(clicks, region, year) %>% 
+  group_by(year, region) %>% 
+  summarise(clicks = sum(clicks)) %>% 
+  mutate(percent = clicks/sum(clicks)*100)
+
+# average clicks per population
+# by region
+avg_clicks_region_bypop <- ramp_pop %>%
+  select(clicks, region, population, year)%>%
+  mutate(mean_clicks = clicks/population) %>% 
+  group_by(year, region)%>%
+  summarise(mean_clicks = sum(mean_clicks))
+```
+
+## Data Sources
+
+Slide with text and bullets.
+
+- RAMP
+- World Bank
+
+## Global Population 2019-2021
+
+```{r pop table}
+# doesn't look good in PDF
+knitr::kable(pop_region_year, caption = "World population by region")
+```
+
+## Global Population Growth 2019-2021
+
+```{r population plot}
+# not a very interesting plot
+# exclude from final
+ggplot(pop_region_year, aes(y_char, log(regional_population),
+                            group = region,
+                            color = region)) +
+  geom_line() +
+  theme_light() +
+  labs(x = element_blank(),
+       y = "Log of population")
+```
+
+## Python hello
+
+```{python}
+
+print("Hello world!")
+```
