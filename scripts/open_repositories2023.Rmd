@@ -11,7 +11,7 @@ output:
   #slidy_presentation: default
   beamer_presentation:
     theme: "PaloAlto"
-    colortheme: "crane"
+    colortheme: "seagull"
     fonttheme: "structurebold"
 knit: (function(inputFile, encoding) {
   rmarkdown::render(inputFile, encoding = encoding,
