@@ -311,6 +311,97 @@ weighted_clicks_device <- clicks_by_device_region %>%
        color = "Region") +
   theme_linedraw() +
   theme(axis.text.x = element_blank())
+
+## Problem with the above is the population difference
+## between regions biases population weighted clicks
+## at a global scale in favor of the global north.
+
+## We can look more closely at this by limiting
+## analysis to top 10 from each region
+## Plot change in clicks relative to change in population
+##---top 10 countries which generate most clicks
+# not weighted by population
+# seems we need a function to do this by region and year
+top_10 <- function(y, r) {
+  t10 <- ramp_pop %>%
+    filter(year == y, region == r) %>% 
+    select(clicks, Country, region, device, year) %>%
+    group_by(Country, region, year, device) %>%
+    summarise(clicks = sum(clicks)) %>%
+    slice_max(clicks, n = 10) %>% 
+    arrange(desc(clicks))
+  return(head(t10, 10))
+}
+
+gn2019t10 <- top_10("2019", "Global North")
+gn2020t10 <- top_10("2020", "Global North")
+gn2021t10 <- top_10("2021", "Global North")
+gs2019t10 <- top_10("2019", "Global South")
+gs2020t10 <- top_10("2020", "Global South")
+gs2021t10 <- top_10("2021", "Global South")
+
+t10All <- gn2019t10 %>% 
+  bind_rows(gn2020t10, gn2021t10, gs2019t10, gs2020t10, gs2021t10)
+
+## plot top 10 countries in both regions
+## not weighted by population
+t10All_plot <- t10All %>%
+  select(region, year, device, clicks) %>%
+  group_by(region, year, device) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  ggplot(aes(x = year, y = total_clicks, color = region)) +
+  geom_line(linewidth = 1, aes(group = region)) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Total click activity by device (2019-2021)",
+       subtitle = "Click activity limited to top 10 countries by region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
+
+# weighted by population
+top_10_pop_wt <- function(y, r) {
+  t10pwt <- ramp_pop%>%
+    filter(region == r, year == y) %>% 
+    mutate(click_weighted = (clicks/population)*100) %>% 
+    select(clicks, Country, population, region, 
+           click_weighted, year, device)%>%
+    group_by(Country, region, year, population, device)%>%
+    summarise(clicks_weighted = sum(click_weighted), clicks = sum(clicks))%>%
+    slice_max(clicks_weighted, n = 10) %>% 
+    arrange(desc(clicks_weighted))
+  return(head(t10pwt, 10))
+}
+
+gn2019t10pwt <- top_10_pop_wt("2019", "Global North")
+gn2020t10pwt <- top_10_pop_wt("2020", "Global North")
+gn2021t10pwt <- top_10_pop_wt("2021", "Global North")
+gs2019t10pwt <- top_10_pop_wt("2019", "Global South")
+gs2020t10pwt <- top_10_pop_wt("2020", "Global South")
+gs2021t10pwt <- top_10_pop_wt("2021", "Global South")
+
+t10Allpwt <- gn2019t10pwt %>% 
+  bind_rows(gn2020t10pwt, gn2021t10pwt, gs2019t10pwt, 
+            gs2020t10pwt, gs2021t10pwt)
+
+## plot top 10 countries in both regions
+## this time weighted by population
+t10Allpwt_plot <- t10Allpwt %>%
+  select(region, year, device, clicks_weighted) %>%
+  group_by(region, year, device) %>% 
+  summarise(total_clicks = sum(clicks_weighted)) %>% 
+  ggplot(aes(x = year, y = total_clicks, color = region)) +
+  geom_line(linewidth = 1, aes(group = region)) +
+  facet_wrap(facets = vars(device)) +
+  labs(title = "Population-weighted click activity by device (2019-2021)",
+       subtitle = "Click activity limited to top 10 countries by region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Region") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
+
 ```
 
 # Background
@@ -391,6 +482,31 @@ unweighted_clicks_device
 weighted_clicks_device
 ```
 
+## Aggregated click data
+
+From the top 10 countries by raw click counts.
+
+```{r}
+t10All_plot
+```
+
+## Aggregated weighted click data
+
+From the top 10 countries by clicks, weighted by population.
+
+```{r}
+t10Allpwt_plot
+```
+
+## Code and documentation
+
+- Supplemental data and code for generating this PDF presentation are
+available on GitHub:
+  - <https://github.com/jonathanwheeler01/open_repositories_2023_wheeler_pham>
+- Documentation and scripts for downloading and aggregating raw RAMP data 
+are included.
+
+
 ## Data Sources (other than RAMP data)
 
 - International Organization for Standardization. (2020),
@@ -402,3 +518,10 @@ Wikimedia Meta-Wiki, Meta, discussion about Wikimedia projects, 1 April,
 available at:
 https://meta.wikimedia.org/w/index.php?title=List_of_countries_by_regional_classification&oldid=19943813 (accessed 12 April 2020).
 - World Bank. (2023), "Population, total," The World Bank Group, https://data.worldbank.org/indicator/SP.POP.TOTL.
+
+## Contact information
+
+- For inquiries about RAMP data, research, or to participate in 
+RAMP please see
+  - <https://rampanalytics.org/>
+  - Or contact us at <mailto:ramp.msu@gmail.com>
