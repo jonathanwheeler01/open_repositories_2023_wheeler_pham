@@ -25,6 +25,13 @@ ramp <- merge(ramp, globalns,
   rename(region = Location, iso3c = country) %>% 
   mutate(iso3c = toupper(iso3c), year = year(date))
 
+## Alternatively country-coded data can be saved to a file and
+## imported for additional analyses. This prevents having to
+## execute the above code every time the script is run.
+#ramp <- read_csv('./raw_data/ramp_country_coded_2019-2021.csv') %>% 
+#  rename(region = Location, iso3c = country) %>% 
+#  mutate(iso3c = toupper(iso3c), year = year(date))
+
 ## For our initial overview, we use RAMP data by itself to demonstrate 
 ## trends by device type during COVID.
 
