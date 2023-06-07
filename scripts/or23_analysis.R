@@ -377,3 +377,81 @@ t10Allpwt_plot <- t10Allpwt %>%
   theme_linedraw() +
   theme(axis.text.x = element_blank())
 
+
+## position vs. clicks table
+library(psych)
+describeBy(ramp_pop$clicks, 
+           list(ramp_pop$region, ramp_pop$device), mat=TRUE)
+
+## Add clicks_weighted to ramp_pop
+ramp_pop$clicks_weighted <-  (ramp_pop$clicks/ramp_pop$population)*100
+
+describeBy(ramp_pop$clicks_weighted, 
+           list(ramp_pop$region, ramp_pop$device), mat=TRUE)
+
+describeBy(ramp_pop$position, 
+           list(ramp_pop$region, ramp_pop$device), mat=TRUE)
+
+
+## the above includes all rows with 0 clicks
+## useful info but lets set a boolean for clicks > 0
+ramp_clicked <- ramp_pop %>% filter(clicks > 0)
+
+describeBy(ramp_clicked$clicks, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$clicks_weighted, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position, 
+           list(ramp_clicked$device), mat=TRUE)
+
+## Compare with rows with 0 clicks
+ramp_unclicked <- ramp_pop %>% filter(clicks == 0)
+
+describeBy(ramp_unclicked$position, 
+           list(ramp_unclicked$region, ramp_unclicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_unclicked$position, 
+           list(ramp_unclicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position,
+           list(ramp_clicked$device), mat=TRUE)
+
+##-- position, click vs. location, clicked
+ramp_clicked_south <- ramp_pop%>%
+  filter(region == "Global South", clicks > 0)
+
+describeBy(ramp_clicked_south$position, 
+           list(ramp_clicked_south$device), mat=TRUE)
+
+##-- position, click vs. location, clicked
+ramp_clicked_north <- ramp_pop%>%
+  filter(region == "Global North", clicks > 0)
+
+describeBy(ramp_clicked_north$position, 
+           list(ramp_clicked_north$device), mat=TRUE)
+
+##-- position, click vs. location, unclicked
+ramp_unclicked_south <- ramp_pop%>%
+  filter(region == "Global South", clicks == 0)
+
+describeBy(ramp_unclicked_south$position, 
+           list(ramp_unclicked_south$device), mat=TRUE)
+
+##-- position, click vs. location, unclicked
+ramp_unclicked_north <- ramp_pop%>%
+  filter(region == "Global North", clicks == 0)
+
+describeBy(ramp_unclicked_north$position, 
+           list(ramp_unclicked_north$device), mat=TRUE)
+
+
+
+
