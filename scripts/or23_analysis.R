@@ -7,30 +7,30 @@ library(zoo)
 library(tidyr)
 
 ## Read the aggregated data output by 'aggregate_raw_RAMP_data.py.'
-ramp <- read_csv('./raw_data/ramp_sample_2019-2021.csv')
+#ramp <- read_csv('./raw_data/ramp_sample_2019-2021.csv')
 
 ## Import the global region code lookup table.
-globalns <- read_csv('./supplemental_data/north_south.csv')
+#globalns <- read_csv('./supplemental_data/north_south.csv')
 
 # Convert country codes to lowercase.
 # They are lowercase in the RAMP data, so this allows us to merge.
-globalns$Countryabbre <- tolower(globalns$Countryabbre)
+#globalns$Countryabbre <- tolower(globalns$Countryabbre)
 
 ## Merge the datasets.
 ## Some rows will be dropped due to the use of 'unknown region' codes
 ## xkk and zzz in the RAMP data that cannot be joined to the regional
 ## country coded lookup table.
-ramp <- merge(ramp, globalns,
-                          by.x = "country", by.y = "Countryabbre") %>% 
-  rename(region = Location, iso3c = country) %>% 
-  mutate(iso3c = toupper(iso3c), year = year(date))
+#ramp <- merge(ramp, globalns,
+#                          by.x = "country", by.y = "Countryabbre") %>% 
+#  rename(region = Location, iso3c = country) %>% 
+#  mutate(iso3c = toupper(iso3c), year = year(date))
 
 ## Alternatively country-coded data can be saved to a file and
 ## imported for additional analyses. This prevents having to
 ## execute the above code every time the script is run.
-#ramp <- read_csv('./raw_data/ramp_country_coded_2019-2021.csv') %>% 
-#  rename(region = Location, iso3c = country) %>% 
-#  mutate(iso3c = toupper(iso3c), year = year(date))
+ramp <- read_csv('./raw_data/ramp_country_coded_2019-2021.csv') %>% 
+  rename(region = Location, iso3c = country) %>% 
+  mutate(iso3c = toupper(iso3c), year = year(date))
 
 ## For our initial overview, we use RAMP data by itself to demonstrate 
 ## trends by device type during COVID.
@@ -376,4 +376,82 @@ t10Allpwt_plot <- t10Allpwt %>%
        color = "Region") +
   theme_linedraw() +
   theme(axis.text.x = element_blank())
+
+
+## position vs. clicks table
+library(psych)
+describeBy(ramp_pop$clicks, 
+           list(ramp_pop$region, ramp_pop$device), mat=TRUE)
+
+## Add clicks_weighted to ramp_pop
+ramp_pop$clicks_weighted <-  (ramp_pop$clicks/ramp_pop$population)*100
+
+describeBy(ramp_pop$clicks_weighted, 
+           list(ramp_pop$region, ramp_pop$device), mat=TRUE)
+
+describeBy(ramp_pop$position, 
+           list(ramp_pop$region, ramp_pop$device), mat=TRUE)
+
+
+## the above includes all rows with 0 clicks
+## useful info but lets set a boolean for clicks > 0
+ramp_clicked <- ramp_pop %>% filter(clicks > 0)
+
+describeBy(ramp_clicked$clicks, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$clicks_weighted, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position, 
+           list(ramp_clicked$device), mat=TRUE)
+
+## Compare with rows with 0 clicks
+ramp_unclicked <- ramp_pop %>% filter(clicks == 0)
+
+describeBy(ramp_unclicked$position, 
+           list(ramp_unclicked$region, ramp_unclicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position, 
+           list(ramp_clicked$region, ramp_clicked$device), mat=TRUE)
+
+describeBy(ramp_unclicked$position, 
+           list(ramp_unclicked$device), mat=TRUE)
+
+describeBy(ramp_clicked$position,
+           list(ramp_clicked$device), mat=TRUE)
+
+##-- position, click vs. location, clicked
+ramp_clicked_south <- ramp_pop%>%
+  filter(region == "Global South", clicks > 0)
+
+describeBy(ramp_clicked_south$position, 
+           list(ramp_clicked_south$device), mat=TRUE)
+
+##-- position, click vs. location, clicked
+ramp_clicked_north <- ramp_pop%>%
+  filter(region == "Global North", clicks > 0)
+
+describeBy(ramp_clicked_north$position, 
+           list(ramp_clicked_north$device), mat=TRUE)
+
+##-- position, click vs. location, unclicked
+ramp_unclicked_south <- ramp_pop%>%
+  filter(region == "Global South", clicks == 0)
+
+describeBy(ramp_unclicked_south$position, 
+           list(ramp_unclicked_south$device), mat=TRUE)
+
+##-- position, click vs. location, unclicked
+ramp_unclicked_north <- ramp_pop%>%
+  filter(region == "Global North", clicks == 0)
+
+describeBy(ramp_unclicked_north$position, 
+           list(ramp_unclicked_north$device), mat=TRUE)
+
+
+
 
