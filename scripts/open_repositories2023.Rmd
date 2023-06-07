@@ -32,30 +32,30 @@ library(zoo)
 library(tidyr)
 
 ## Read the aggregated data output by 'aggregate_raw_RAMP_data.py.'
-ramp <- read_csv('../raw_data/ramp_sample_2019-2021.csv')
+#ramp <- read_csv('../raw_data/ramp_sample_2019-2021.csv')
 
 ## Import the global region code lookup table.
-globalns <- read_csv('../supplemental_data/north_south.csv')
+#globalns <- read_csv('../supplemental_data/north_south.csv')
 
 # Convert country codes to lowercase.
 # They are lowercase in the RAMP data, so this allows us to merge.
-globalns$Countryabbre <- tolower(globalns$Countryabbre)
+#globalns$Countryabbre <- tolower(globalns$Countryabbre)
 
 ## Merge the datasets.
 ## Some rows will be dropped due to the use of 'unknown region' codes
 ## xkk and zzz in the RAMP data that cannot be joined to the regional
 ## country coded lookup table.
-ramp <- merge(ramp, globalns,
-                          by.x = "country", by.y = "Countryabbre") %>% 
-  rename(region = Location, iso3c = country) %>% 
-  mutate(iso3c = toupper(iso3c), year = year(date))
+#ramp <- merge(ramp, globalns,
+#                          by.x = "country", by.y = "Countryabbre") %>% 
+#  rename(region = Location, iso3c = country) %>% 
+#  mutate(iso3c = toupper(iso3c), year = year(date))
 
 ## Alternatively country-coded data can be saved to a file and
 ## imported for additional analyses. This prevents having to
 ## execute the above code every time the script is run.
-#ramp <- read_csv('./raw_data/ramp_country_coded_2019-2021.csv') %>% 
-#  rename(region = Location, iso3c = country) %>% 
-#  mutate(iso3c = toupper(iso3c), year = year(date))
+ramp <- read_csv('./raw_data/ramp_country_coded_2019-2021.csv') %>% 
+  rename(region = Location, iso3c = country) %>% 
+  mutate(iso3c = toupper(iso3c), year = year(date))
 
 ## For our initial overview, we use RAMP data by itself to demonstrate 
 ## trends by device type during COVID.
