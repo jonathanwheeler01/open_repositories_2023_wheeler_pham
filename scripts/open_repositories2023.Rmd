@@ -19,7 +19,8 @@ knit: (function(inputFile, encoding) {
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, 
+                      warning = FALSE)
 ```
 
 ```{r read data and create plot objects, include=FALSE, message=FALSE}
@@ -53,10 +54,13 @@ library(tidyr)
 ## Alternatively country-coded data can be saved to a file and
 ## imported for additional analyses. This prevents having to
 ## execute the above code every time the script is run.
-ramp <- read_csv('./raw_data/ramp_country_coded_2019-2021.csv') %>% 
+ramp <- read_csv('../raw_data/ramp_country_coded_2019-2021.csv') %>%
   rename(region = Location, iso3c = country) %>% 
   mutate(iso3c = toupper(iso3c), year = year(date))
+#gc()
+```
 
+```{r label global region factors}
 ## For our initial overview, we use RAMP data by itself to demonstrate 
 ## trends by device type during COVID.
 
@@ -76,7 +80,10 @@ ramp <- ramp %>%
 ramp$region <- as.factor(ramp$region)
 levels(ramp$region)[1] <- 'Global South'
 levels(ramp$region)[2] <- 'Global North'
+#gc()
+```
 
+```{r total clicks per day 1st plot}
 # Plot total clicks per day
 # with moving average at week (7), month (30), quarter (90)
 total_clicks_per_day <- ramp %>% 
@@ -100,10 +107,10 @@ total_clicks_per_day <- ramp %>%
                                 "avg_clicks_month",
                                 "avg_clicks_quarter"),
                      labels = c("7 day", "30 day", "90 day"),
-                     values = c("firebrick1", "blue4", "yellow4", "black")) +
-  scale_linewidth_manual(values = c(1.2, 1.2, 1.2, .5),
+                     values = c("yellow4", "blue4", "red", "black")) +
+  scale_linewidth_manual(values = c(2, 2, 1.2, .5),
                          guide = FALSE) +
-  scale_alpha_manual(values = c(.7, .7, .7, .4),
+  scale_alpha_manual(values = c(.8, .8, .7, .6),
                      guide = FALSE) +
   labs(title = "Total clicks per day (2019-2021)",
        subtitle = "RAMP participating institutional repositories",
@@ -111,7 +118,9 @@ total_clicks_per_day <- ramp %>%
        y = element_blank(),
        color = "Rolling averages") +
   theme_linedraw()
-
+#gc()
+```
+```{r total clicks per day by region}
 ## Going to use the 30 day average throughout
 ## 30 day is smooth but not too smooth
 ## Total clicks per day, 30 day rolling average
@@ -130,9 +139,9 @@ total_clicks_30day_ma_region <- ramp %>%
   scale_color_manual(breaks = c("avg_clicks_month"),
                      labels = c("30 day"),
                      values = c("red", "black")) +
-  scale_linewidth_manual(values = c(1, .5),
+  scale_linewidth_manual(values = c(2, .5),
                          guide = FALSE) +
-  scale_alpha_manual(values = c(.9, .4),
+  scale_alpha_manual(values = c(.9, .6),
                      guide = FALSE) +
   facet_wrap(facets = vars(region)) +
   labs(title = "Total clicks per day (2019-2021)",
@@ -142,8 +151,10 @@ total_clicks_30day_ma_region <- ramp %>%
        color = "Rolling average") +
   theme_linedraw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#gc()
+```
 
-
+```{r total clicks by region 2020}
 ## Above, filtered to just 2020
 total_clicks_30day_ma_region_2020 <- ramp %>% 
   select(date, clicks, region, year) %>% 
@@ -160,9 +171,9 @@ total_clicks_30day_ma_region_2020 <- ramp %>%
   scale_color_manual(breaks = c("avg_clicks_month"),
                      labels = c("30 day"),
                      values = c("red", "black")) +
-  scale_linewidth_manual(values = c(1, .5),
+  scale_linewidth_manual(values = c(2, .5),
                          guide = FALSE) +
-  scale_alpha_manual(values = c(.9, .4),
+  scale_alpha_manual(values = c(.9, .6),
                      guide = FALSE) +
   facet_wrap(facets = vars(region)) +
   labs(title = "Total clicks per day (2020)",
@@ -172,8 +183,10 @@ total_clicks_30day_ma_region_2020 <- ramp %>%
        color = "Rolling average") +
   theme_linedraw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#gc()
+```
 
-
+```{r clicks by region by device 2019-2021}
 ## The full 2019-2021 time series
 ## clicks by device
 ## faceted by region
@@ -191,9 +204,9 @@ clicks_device_region_all <- ramp %>%
     scale_color_manual(breaks = c("avg_clicks_month"),
                        labels = c("30 day"),
                        values = c("red", "black")) +
-    scale_linewidth_manual(values = c(.75, .5),
+    scale_linewidth_manual(values = c(.7, .5),
                            guide = FALSE) +
-    scale_alpha_manual(values = c(.8, .6),
+    scale_alpha_manual(values = c(.9, .6),
                        guide = FALSE) +
     facet_wrap(facets = vars(region, device)) +
     labs(title = "Total clicks per day (2019-2021)",
@@ -203,9 +216,10 @@ clicks_device_region_all <- ramp %>%
          color = "Rolling average") +
     theme_linedraw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#gc()
+```
 
-
-
+```{r clicks by device by region 2020}
 ## As above, filtered to 2020
 ## faceted by device and region
 clicks_device_region_2020 <- ramp %>% 
@@ -223,9 +237,9 @@ clicks_device_region_2020 <- ramp %>%
   scale_color_manual(breaks = c("avg_clicks_month"),
                      labels = c("30 day"),
                      values = c("red", "black")) +
-  scale_linewidth_manual(values = c(.75, .5),
+  scale_linewidth_manual(values = c(2, .6),
                          guide = FALSE) +
-  scale_alpha_manual(values = c(.8, .6),
+  scale_alpha_manual(values = c(.9, .7),
                      guide = FALSE) +
   facet_wrap(facets = vars(region, device)) +
   labs(title = "Total clicks per day (2020)",
@@ -235,6 +249,49 @@ clicks_device_region_2020 <- ramp %>%
        color = "Rolling average") +
   theme_linedraw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#gc()
+```
+
+```{r clicks by device by region excluding tablet 2020}
+## As above, filtered to 2020
+## faceted by device and region
+clicks_desktop_mobile_region_2020 <- ramp %>% 
+  filter(device != 'TABLET') %>% 
+  select(date, clicks, region, device, year) %>% 
+  group_by(year, region, device, date) %>% 
+  filter(year == "2020") %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  mutate(avg_clicks_month = zoo::rollmean(total_clicks, k = 30, fill = NA)) %>% 
+  pivot_longer(names_to = "date_range",
+               values_to = "sum_clicks",
+               cols = c(total_clicks, avg_clicks_month)) %>% 
+  ggplot(aes(x = date, y = sum_clicks, color = date_range)) +
+  geom_line(mapping = aes(linewidth = date_range,
+                          alpha = date_range)) +
+  scale_color_manual(breaks = c("avg_clicks_month"),
+                     labels = c("30 day"),
+                     values = c("red", "black")) +
+  scale_linewidth_manual(values = c(2, .5),
+                         guide = FALSE) +
+  scale_alpha_manual(values = c(.9, .6),
+                     guide = FALSE) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Total clicks per day (2020)",
+       subtitle = "Desktop and mobile devices by global region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Rolling average") +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#gc()
+```
+
+```{r get wb population data}
+## From here on we will only use data about desktop and mobile
+## devices, to improve use of slide space.
+
+## The accompanying script includes data/plots for
+## all three devices types.
 
 ## A previous analysis on a smaller dataset
 ## indicated that users in the global south
@@ -247,9 +304,13 @@ clicks_device_region_2020 <- ramp %>%
 
 # Web search gives the following as total population indicator
 # https://data.worldbank.org/indicator/SP.POP.TOTL
-world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
-                 start = 2019,
-                 end = 2021)
+#world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
+#                 start = 2019,
+#                 end = 2021)
+
+## Save to file for offline work
+#write_csv(world_pop, '../supplemental_data/wb_population.csv')
+world_pop <- read_csv('../supplemental_data/wb_population.csv')
 
 # need to add region data to population data
 global_region <- read_csv('../supplemental_data/north_south.csv')
@@ -267,13 +328,20 @@ pop_region <- merge(world_pop, global_region,
 pop_region$region <- as.factor(pop_region$region)
 levels(pop_region$region)[1] <- 'Global South'
 levels(pop_region$region)[2] <- 'Global North'
+#gc()
+```
 
+```{r merge ramp and population data}
 # join RAMP data with population data
 ramp_pop <- inner_join(ramp, world_pop,
                        by = c("iso3c", "year"))
+#gc()
+```
 
+```{r clicks by device by region by population}
 # We can look at clicks by device and by region
 clicks_by_device_region <- ramp_pop %>% 
+  filter(device != "TABLET") %>% 
   select(region, population, device, clicks, year) %>% 
   group_by(region, device, population, year) %>% 
   summarise(clicks = sum(clicks)) %>% 
@@ -282,27 +350,32 @@ clicks_by_device_region <- ramp_pop %>%
             clicks = sum(clicks)) %>% 
   mutate(clicks_weighted = (clicks/pop)*100) %>%
   arrange(desc(region))
+#gc()
+```
 
+```{r plot clicks by device by region}
 # Note we are using population data to allow us
 # to derive population weighted click values
 # First, plot using unweighted values
 options(scipen = 999)
 unweighted_clicks_device <- clicks_by_device_region %>% 
   ggplot(aes(x = year, y = clicks, color = region)) +
-  geom_line(linewidth = 1) +
+  geom_line(linewidth = 2) +
   facet_wrap(facets = vars(device)) +
-  labs(title = "Clicks by device (2019-2021)",
+  labs(title = "Sum of clicks by device (2019-2021)",
        x = element_blank(),
        y = element_blank(),
        color = "Region") +
   theme_linedraw() +
   theme(axis.text.x = element_blank())
+#gc()
+```
 
-
+```{r plot pop weighted clicks by device by region}
 # Now use clicks weighted by population
 weighted_clicks_device <- clicks_by_device_region %>% 
   ggplot(aes(x = year, y = clicks_weighted, color = region)) +
-  geom_line(linewidth = 1) +
+  geom_line(linewidth = 2) +
   facet_wrap(facets = vars(device)) +
   labs(title = "Clicks by device (2019-2021)",
        subtitle = "Weighted by population (per 100 people)",
@@ -311,7 +384,10 @@ weighted_clicks_device <- clicks_by_device_region %>%
        color = "Region") +
   theme_linedraw() +
   theme(axis.text.x = element_blank())
+#gc()
+```
 
+```{r create top 10 device use clicks}
 ## Problem with the above is the population difference
 ## between regions biases population weighted clicks
 ## at a global scale in favor of the global north.
@@ -342,7 +418,10 @@ gs2021t10 <- top_10("2021", "Global South")
 
 t10All <- gn2019t10 %>% 
   bind_rows(gn2020t10, gn2021t10, gs2019t10, gs2020t10, gs2021t10)
+#gc()
+```
 
+```{r plot top 10 device use}
 ## plot top 10 countries in both regions
 ## not weighted by population
 t10All_plot <- t10All %>%
@@ -359,7 +438,30 @@ t10All_plot <- t10All %>%
        color = "Region") +
   theme_linedraw() +
   theme(axis.text.x = element_blank())
+#gc()
+```
+```{r plot top 10 device use include countries}
+## plot top 10 countries in both regions
+## not weighted by population
+t10All_country_plot <- t10All %>%
+  select(region, Country, year, device, clicks) %>%
+  group_by(region, Country, year, device) %>% 
+  summarise(total_clicks = sum(clicks)) %>% 
+  ggplot(aes(x = year, y = total_clicks)) +
+  geom_point(aes(color = Country),
+             size = 2) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Total click activity by device (2019-2021)",
+       subtitle = "Click activity limited to top 10 countries by region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Country") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
+#gc()
+```
 
+```{r create top 10 device use by pop-weighted clicks}
 # weighted by population
 top_10_pop_wt <- function(y, r) {
   t10pwt <- ramp_pop%>%
@@ -384,7 +486,10 @@ gs2021t10pwt <- top_10_pop_wt("2021", "Global South")
 t10Allpwt <- gn2019t10pwt %>% 
   bind_rows(gn2020t10pwt, gn2021t10pwt, gs2019t10pwt, 
             gs2020t10pwt, gs2021t10pwt)
+#gc()
+```
 
+```{r plot top 10 device use pop-weighted}
 ## plot top 10 countries in both regions
 ## this time weighted by population
 t10Allpwt_plot <- t10Allpwt %>%
@@ -401,7 +506,27 @@ t10Allpwt_plot <- t10Allpwt %>%
        color = "Region") +
   theme_linedraw() +
   theme(axis.text.x = element_blank())
+#gc()
+```
 
+```{r plot top 10 device use pop-weighted include countries}
+## plot top 10 countries in both regions
+## this time weighted by population
+t10Allpwt_country_plot <- t10Allpwt %>%
+  select(region, Country, year, device, clicks_weighted) %>%
+  group_by(region, Country, year, device) %>% 
+  summarise(total_clicks = sum(clicks_weighted)) %>% 
+  ggplot(aes(x = year, y = total_clicks)) +
+  geom_point(size = 2, aes(color = Country)) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Population-weighted click activity by device (2019-2021)",
+       subtitle = "Click activity limited to top 10 countries by region",
+       x = element_blank(),
+       y = element_blank(),
+       color = "Country") +
+  theme_linedraw() +
+  theme(axis.text.x = element_blank())
+#gc()
 ```
 
 # Background
@@ -427,10 +552,9 @@ Invite discussion about future research and the future of RAMP.
   - Users from the global south are far more likely to use mobile devices
   - Weak but significant correlation between population and access of IR content
 - Redo previous analysis with more data
-  - _**Identify**_ COVID impact, if any, on access of IR content
-  - Surface trends in RAMP data and identify external data source of research 
-  interest
-  - Define research questions and invite further analysis and participation
+  - _**Observe**_ trends in access of IR content during COVID
+  - _**Identify**_ external data sources of research interest
+  - _**Define**_ research questions for further analysis and collaboration
 
 ## About the present sample
 
@@ -442,9 +566,11 @@ Invite discussion about future research and the future of RAMP.
   - Sample is not representative
     - Global regions
     - Languages
-  - Google Search Console API is the sole data source
+  - Google Search Console API is the sole RAMP data source
+    - Absence of item level metadata and search queries limits potential
+    for content analysis
 
-# Trends
+# Access to Repositories During COVID-19
 
 ## General seasonal trend (2019-2021)
 
@@ -455,8 +581,6 @@ total_clicks_per_day
 ```
 
 ## COVID disruption of seasonal trend (2020)
-
-Daily totals with 30-day moving average.
 
 ```{r COVID disruption of trend 2020}
 total_clicks_30day_ma_region_2020
@@ -470,6 +594,14 @@ Daily totals with 30-day moving average.
 clicks_device_region_2020
 ```
 
+## Desktop and mobile devices
+
+```{r}
+clicks_desktop_mobile_region_2020
+```
+
+# Augmenting RAMP Data
+
 ## Overall clicks by device
 
 ```{r}
@@ -482,21 +614,51 @@ unweighted_clicks_device
 weighted_clicks_device
 ```
 
-## Aggregated click data
-
-From the top 10 countries by raw click counts.
+## Total clicks from top 10 countries by region
 
 ```{r}
 t10All_plot
 ```
 
-## Aggregated weighted click data
-
-From the top 10 countries by clicks, weighted by population.
+## Total weighted clicks from top 10 countries by region
 
 ```{r}
 t10Allpwt_plot
 ```
+
+## Comparing position and total clicks by device - global north
+
+![]("../clicks_device_pos_gn.png")
+
+## Comparing position and total clicks by device - global south
+
+![]("../clicks_device_pos_gs.png")
+
+## Comparing position and population-weighted clicks by device - global north
+
+![]("../wghtd_clicks_device_pos_gn.png")
+
+## Comparing position and population-weighted clicks by device - global south
+
+![]("../wghtd_clicks_device_pos_gs.png")
+
+# Avenues for Further Inquiry
+
+## Click correlations
+
+We count clicks on IR content from search engine result pages as "access"
+of that content.
+
+- Does the previously described correlation between clicks and population persist with larger datasets?
+  - When click activity is weighted by population, access from the top 10 countries from the Global South is limited to desktop devices only.
+  - What other factors influence repository access across global regions?
+
+## Discoverability of repository content
+
+- Which countries and users are driving mobile access of repository content?
+- Potential benefit of search engine optimization.
+  - Definition and implementation of citation metadata schema.
+- Which factors improve accessibility of content across devices?
 
 ## Code and documentation
 

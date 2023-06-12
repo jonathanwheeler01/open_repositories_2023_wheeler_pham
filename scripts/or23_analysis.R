@@ -223,10 +223,11 @@ clicks_device_region_2020 <- ramp %>%
 
 # Web search gives the following as total population indicator
 # https://data.worldbank.org/indicator/SP.POP.TOTL
-world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
-                 start = 2019,
-                 end = 2021)
+#world_pop <- WDI(indicator = c(population = 'SP.POP.TOTL'),
+#                 start = 2019,
+#                 end = 2021)
 
+world_pop <- read_csv("./supplemental_data/wb_population.csv")
 # need to add region data to population data
 global_region <- read_csv('./supplemental_data/north_south.csv')
 
@@ -393,6 +394,17 @@ describeBy(ramp_pop$position,
            list(ramp_pop$region, ramp_pop$device), mat=TRUE)
 
 
+## plot with raw click sums
+#ggplot(ramp_pop, aes(x = position, y = clicks, color = device)) +
+#  geom_point() +
+#  facet_wrap(facets = vars(region, device))
+
+## plot with pop-weighted click sums
+#ggplot(ramp_pop, aes(x = position, y = clicks_weighted, 
+#                     color = device)) +
+#  geom_point() +
+#  facet_wrap(facets = vars(region, device))
+
 ## the above includes all rows with 0 clicks
 ## useful info but lets set a boolean for clicks > 0
 ramp_clicked <- ramp_pop %>% filter(clicks > 0)
@@ -449,9 +461,38 @@ describeBy(ramp_unclicked_south$position,
 ramp_unclicked_north <- ramp_pop%>%
   filter(region == "Global North", clicks == 0)
 
-describeBy(ramp_unclicked_north$position, 
-           list(ramp_unclicked_north$device), mat=TRUE)
+t_test <-  describeBy(ramp_unclicked_north$position, 
+                      list(ramp_unclicked_north$device), mat=TRUE)
 
+# Try plotting clicks and weighted clicks by position, device, region
+# Add regression lines to the below
+clicks_device_position_plot <- ramp_pop %>% 
+  filter(device != "TABLET") %>% 
+  select(position, clicks, device, region) %>% 
+  ggplot(aes(x = position, y = clicks)) +
+  geom_point(aes(color = device)) +
+  geom_smooth(linewidth = 2) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Clicks relative to position",
+       subtitle = "By device and region",
+       x = "Position",
+       y = "Total clicks")
+ggsave("clicks_device_pos.png", width = 5, height = 5)
+  
+weighted_clicks_device_position_plot <- ramp_pop %>% 
+  filter(device != "TABLET") %>% 
+  select(position, clicks_weighted, device, region) %>% 
+  ggplot(aes(x = position, y = clicks)) +
+  geom_point(aes(color = device)) +
+  geom_smooth(linewidth = 2) +
+  facet_wrap(facets = vars(region, device)) +
+  labs(title = "Population weighted clicks relative to position",
+       subtitle = "By device and region",
+       x = "Position",
+       y = "Total clicks")
+ggsave("wghtd_clicks_device_pos.png", width = 5, height = 5)
 
-
+  
+  
+  
 
