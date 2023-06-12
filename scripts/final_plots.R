@@ -94,7 +94,8 @@ gc()
 # Try plotting clicks and weighted clicks by position, device, region
 # Add regression lines to the below
 clicks_device_position <- ramp_pop %>% 
-  filter(device != "TABLET", region == "Global North") %>% 
+  filter(device != "TABLET", region == "Global South",
+         clicks > 0) %>% 
   select(position, clicks, device, region)
 
 cdp_plot <- ggplot(clicks_device_position, 
@@ -114,7 +115,7 @@ cdp_plot_facet <-  cdp_plot_smooth + facet_wrap(facets = vars(region, device))
 
 rm(cdp_plot_smooth)
 cdp_plot_labels <- cdp_plot_facet + labs(title = "Clicks relative to position",
-                                         subtitle = "Global North by device",
+                                         subtitle = "Global South by device",
                                          x = "Position",
                                          y = "Total clicks")
 
@@ -122,14 +123,15 @@ rm(cdp_plot_facet)
 cdp_plot_theme <- cdp_plot_labels + theme_linedraw()
 
 rm(cdp_plot_labels)
-ggsave("clicks_device_pos_gn.png", width = 5, height = 5)
+ggsave("clicks_device_pos_gs.png", width = 5, height = 5)
 
 rm(cdp_plot_theme)
 rm(clicks_device_position)
 gc()
 
 weighted_clicks_device_position <- ramp_pop %>% 
-  filter(device != "TABLET", region == "Global North") %>% 
+  filter(device != "TABLET", region == "Global South",
+         clicks_weighted > 0) %>% 
   select(position, clicks_weighted, device, region)
 
 wcdp_plot <- ggplot(weighted_clicks_device_position,
@@ -140,11 +142,11 @@ wcdp_plot + geom_point(aes(color = device),
   geom_smooth(linewidth = 1, method = "lm", se = FALSE, color = "red") +
   facet_wrap(facets = vars(region, device)) +
   labs(title = "Population weighted clicks relative to position",
-       subtitle = "Global North by device",
+       subtitle = "Global South by device",
        x = "Position",
        y = "Total clicks") + 
   theme_linedraw()
-ggsave("wghtd_clicks_device_pos_gn.png", width = 5, height = 5)
+ggsave("wghtd_clicks_device_pos_gs.png", width = 5, height = 5)
 
 rm(wcdp_plot)
 rm(weighted_clicks_device_position)
