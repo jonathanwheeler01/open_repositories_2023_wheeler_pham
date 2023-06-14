@@ -540,7 +540,7 @@ t10Allpwt_country_plot <- t10Allpwt %>%
   - No-cost, online dashboards for participating repositories
 - Open datasets
   - [Subset of 35 IR, Jan 1 - May 31, 2019](https://datadryad.org/stash/dataset/doi:10.5061%2Fdryad.fbg79cnr0)
-  - [All participating IR (with consent), 2017 - 2021](https://datadryad.org/search?q=repository+analytics+and+metrics+portal)
+  - [All participating IR, 2017 - 2021](https://datadryad.org/search?q=repository+analytics+and+metrics+portal)
   - [Complete documentation is available.](https://digitalrepository.unm.edu/ulls_fsp/141/)
 
 ## Objectives
@@ -628,19 +628,19 @@ t10Allpwt_plot
 
 ## Comparing position and total clicks by device - global north
 
-![]("../clicks_device_pos_gn.png")
+![]("../figures/clicks_device_pos_gn.png")
 
 ## Comparing position and total clicks by device - global south
 
-![]("../clicks_device_pos_gs.png")
+![]("../figures/clicks_device_pos_gs.png")
 
 ## Comparing position and population-weighted clicks by device - global north
 
-![]("../wghtd_clicks_device_pos_gn.png")
+![]("../figures/wghtd_clicks_device_pos_gn.png")
 
 ## Comparing position and population-weighted clicks by device - global south
 
-![]("../wghtd_clicks_device_pos_gs.png")
+![]("../figures/wghtd_clicks_device_pos_gs.png")
 
 # Avenues for Further Inquiry
 
